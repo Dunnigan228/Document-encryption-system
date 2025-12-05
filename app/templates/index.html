@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шифрование документов</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">
+                <span class="material-icons">lock</span>
+                <span data-i18n="logo">SecureDocs</span>
+            </div>
+            <div class="lang-switch">
+                <button class="lang-btn active" data-lang="ru">RU</button>
+                <button class="lang-btn" data-lang="en">EN</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1 data-i18n="title">Шифрование документов</h1>
+            <p data-i18n="subtitle">Защитите свои файлы надёжным шифрованием</p>
+        </div>
+
+        <div class="tabs-container">
+            <div class="tabs">
+                <button class="tab active" data-tab="encrypt">
+                    <span class="material-icons">enhanced_encryption</span>
+                    <span data-i18n="tab_encrypt">Зашифровать</span>
+                </button>
+                <button class="tab" data-tab="decrypt">
+                    <span class="material-icons">no_encryption</span>
+                    <span data-i18n="tab_decrypt">Расшифровать</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <div id="encrypt-panel" class="panel active">
+                <div class="card">
+                    <form id="encrypt-form" enctype="multipart/form-data">
+                        <div class="upload-zone" id="encrypt-upload-zone">
+                            <input type="file" id="encrypt-file" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required>
+                            <div class="upload-content">
+                                <span class="material-icons upload-icon">cloud_upload</span>
+                                <p class="upload-title" data-i18n="upload_title">Перетащите файл сюда</p>
+                                <p class="upload-subtitle" data-i18n="upload_subtitle">или нажмите для выбора</p>
+                                <span class="upload-formats">PDF, DOC, DOCX, XLS, XLSX, TXT</span>
+                            </div>
+                            <div class="file-selected" style="display: none;">
+                                <span class="material-icons">description</span>
+                                <span class="selected-name"></span>
+                                <button type="button" class="remove-btn" onclick="removeFile('encrypt')">
+                                    <span class="material-icons">close</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="encrypt-password" data-i18n="password_label">Пароль (необязательно)</label>
+                            <div class="input-wrapper">
+                                <input type="password" id="encrypt-password" name="password" data-i18n-placeholder="password_placeholder" placeholder="Оставьте пустым для автогенерации">
+                                <span class="material-icons input-icon">vpn_key</span>
+                            </div>
+                            <span class="input-hint" data-i18n="password_hint">Если не указать, будет создан автоматически</span>
+                        </div>
+
+                        <button type="submit" class="submit-btn">
+                            <span class="btn-content">
+                                <span class="material-icons">lock</span>
+                                <span data-i18n="btn_encrypt">Зашифровать</span>
+                            </span>
+                            <span class="btn-loading" style="display: none;">
+                                <span class="spinner"></span>
+                                <span data-i18n="btn_processing">Обработка...</span>
+                            </span>
+                        </button>
+                    </form>
+
+                    <div id="encrypt-result" class="result-block" style="display: none;">
+                        <div class="result-header success">
+                            <span class="material-icons">check_circle</span>
+                            <h3 data-i18n="encrypt_success">Файл зашифрован</h3>
+                        </div>
+
+                        <div class="result-info">
+                            <div class="info-row">
+                                <span data-i18n="result_file">Файл:</span>
+                                <strong id="result-original-name"></strong>
+                            </div>
+                            <div class="info-row">
+                                <span data-i18n="result_type">Тип:</span>
+                                <strong id="result-file-type"></strong>
+                            </div>
+                            <div class="info-row">
+                                <span data-i18n="result_size_before">Размер до:</span>
+                                <strong id="result-original-size"></strong>
+                            </div>
+                            <div class="info-row">
+                                <span data-i18n="result_size_after">Размер после:</span>
+                                <strong id="result-encrypted-size"></strong>
+                            </div>
+                            <div class="info-row password-info" style="display: none;">
+                                <span data-i18n="result_password">Пароль:</span>
+                                <div class="password-field">
+                                    <code id="result-password"></code>
+                                    <button type="button" onclick="copyPassword()" class="icon-btn" title="Копировать">
+                                        <span class="material-icons">content_copy</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="result-actions">
+                            <button onclick="downloadFile('encrypted')" class="action-btn primary">
+                                <span class="material-icons">download</span>
+                                <span data-i18n="download_encrypted">Скачать файл</span>
+                            </button>
+                            <button onclick="downloadFile('key')" class="action-btn">
+                                <span class="material-icons">key</span>
+                                <span data-i18n="download_key">Скачать ключ</span>
+                            </button>
+                        </div>
+
+                        <div class="notice warning">
+                            <span class="material-icons">warning</span>
+                            <p data-i18n="warning_save">Сохраните оба файла. Без ключа расшифровка невозможна.</p>
+                        </div>
+
+                        <button onclick="resetEncrypt()" class="text-btn">
+                            <span class="material-icons">refresh</span>
+                            <span data-i18n="encrypt_another">Зашифровать другой файл</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="decrypt-panel" class="panel">
+                <div class="card">
+                    <form id="decrypt-form" enctype="multipart/form-data">
+                        <div class="upload-zone" id="decrypt-upload-zone">
+                            <input type="file" id="decrypt-file" name="encrypted_file" accept=".encrypted,.enc" required>
+                            <div class="upload-content">
+                                <span class="material-icons upload-icon">folder_open</span>
+                                <p class="upload-title" data-i18n="upload_encrypted">Зашифрованный файл</p>
+                                <p class="upload-subtitle" data-i18n="upload_subtitle">или нажмите для выбора</p>
+                                <span class="upload-formats">.encrypted, .enc</span>
+                            </div>
+                            <div class="file-selected" style="display: none;">
+                                <span class="material-icons">description</span>
+                                <span class="selected-name"></span>
+                                <button type="button" class="remove-btn" onclick="removeFile('decrypt')">
+                                    <span class="material-icons">close</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="upload-zone" id="key-upload-zone">
+                            <input type="file" id="key-file" name="key_file" accept=".key" required>
+                            <div class="upload-content">
+                                <span class="material-icons upload-icon">vpn_key</span>
+                                <p class="upload-title" data-i18n="upload_key">Файл ключа</p>
+                                <p class="upload-subtitle" data-i18n="upload_subtitle">или нажмите для выбора</p>
+                                <span class="upload-formats">.key</span>
+                            </div>
+                            <div class="file-selected" style="display: none;">
+                                <span class="material-icons">key</span>
+                                <span class="selected-name"></span>
+                                <button type="button" class="remove-btn" onclick="removeFile('key')">
+                                    <span class="material-icons">close</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="decrypt-password" data-i18n="decrypt_password_label">Пароль (если использовался)</label>
+                            <div class="input-wrapper">
+                                <input type="password" id="decrypt-password" name="password" data-i18n-placeholder="decrypt_password_placeholder" placeholder="Введите пароль, если указывали при шифровании">
+                                <span class="material-icons input-icon">vpn_key</span>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="submit-btn">
+                            <span class="btn-content">
+                                <span class="material-icons">lock_open</span>
+                                <span data-i18n="btn_decrypt">Расшифровать</span>
+                            </span>
+                            <span class="btn-loading" style="display: none;">
+                                <span class="spinner"></span>
+                                <span data-i18n="btn_processing">Обработка...</span>
+                            </span>
+                        </button>
+                    </form>
+
+                    <div id="decrypt-result" class="result-block" style="display: none;">
+                        <div class="result-header success">
+                            <span class="material-icons">check_circle</span>
+                            <h3 data-i18n="decrypt_success">Файл расшифрован</h3>
+                        </div>
+
+                        <div class="result-info">
+                            <div class="info-row">
+                                <span data-i18n="result_filename">Имя файла:</span>
+                                <strong id="decrypt-result-filename"></strong>
+                            </div>
+                            <div class="info-row">
+                                <span data-i18n="result_type">Тип:</span>
+                                <strong id="decrypt-result-type"></strong>
+                            </div>
+                            <div class="info-row">
+                                <span data-i18n="result_size">Размер:</span>
+                                <strong id="decrypt-result-size"></strong>
+                            </div>
+                        </div>
+
+                        <div class="result-actions">
+                            <button onclick="downloadFile('decrypted')" class="action-btn primary">
+                                <span class="material-icons">download</span>
+                                <span data-i18n="download_decrypted">Скачать файл</span>
+                            </button>
+                        </div>
+
+                        <button onclick="resetDecrypt()" class="text-btn">
+                            <span class="material-icons">refresh</span>
+                            <span data-i18n="decrypt_another">Расшифровать другой файл</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p data-i18n="footer">AES-256 + ChaCha20 + RSA-4096</p>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
