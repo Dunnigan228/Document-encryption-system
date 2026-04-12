@@ -5,6 +5,13 @@ from pydantic import BaseModel
 from typing import Optional
 
 
+class ErrorResponse(BaseModel):
+    """Standard error response shape for all API error codes. Per D-01."""
+    error_code: str          # e.g. FILE_TOO_LARGE, NOT_FOUND, UNSUPPORTED_FORMAT
+    message: str             # Human-readable English message
+    detail: Optional[str] = None  # Extra context; never contains stack traces or file paths
+
+
 class EncryptResponse(BaseModel):
     success: bool
     file_id: str
@@ -14,7 +21,6 @@ class EncryptResponse(BaseModel):
     file_type: str
     original_size: int
     encrypted_size: int
-    password_generated: Optional[str] = None
 
 
 class DecryptResponse(BaseModel):
