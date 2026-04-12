@@ -40,3 +40,21 @@ class AcceptedResponse(BaseModel):
     original_filename: str
     file_type: str
     expires_at: str       # ISO 8601 UTC string
+
+
+class JobStatusResponse(BaseModel):
+    """Response for GET /api/files/{file_id} — reflects current job state.
+
+    Per D-02: status=="failed" is a valid terminal state for a known job.
+    The endpoint returns HTTP 200 for all known jobs (including failed).
+    HTTP 404 is returned only when the file_id is unknown.
+    """
+    file_id: str
+    status: str                          # queued | processing | complete | failed
+    job_type: str                        # encrypt | decrypt
+    original_filename: str
+    file_type: str
+    expires_at: str                      # ISO 8601 UTC
+    poll_url: str                        # "/api/files/{file_id}"
+    download_url: Optional[str] = None  # set only when status == "complete"
+    error: Optional[str] = None         # set only when status == "failed"
