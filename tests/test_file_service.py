@@ -182,8 +182,8 @@ def test_restore_updates_sidecar_on_processing_reset(jobs_dir, sample_meta):
 
 
 def test_restore_skips_corrupt_sidecar(jobs_dir):
-    (jobs_dir / "bad.json").write_text("NOT JSON", encoding="utf-8")
     jobs_dir.mkdir(parents=True, exist_ok=True)
+    (jobs_dir / "bad.json").write_text("NOT JSON", encoding="utf-8")
     svc = FileService(jobs_dir=jobs_dir)
     count = svc.restore_from_disk(jobs_dir.parent)
     assert count == 0
