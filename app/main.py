@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.routes import encrypt, decrypt, files, health
+from app.api.routes import encrypt, decrypt, files, health, keys, inspect
 from app.config import get_settings
 from app.services.file_service import file_service
 
@@ -135,9 +135,11 @@ app.add_middleware(
 
 # Core routers — always mounted
 app.include_router(health.router)
+app.include_router(keys.router)        # NEW — per D-05, KEY-01
+app.include_router(inspect.router)     # NEW — registered BEFORE files.router (Pitfall 6)
 app.include_router(encrypt.router)
 app.include_router(decrypt.router)
-app.include_router(files.router)
+app.include_router(files.router)       # files router LAST among /api/files/* routes
 
 # Conditional UI mount — D-07, UI-01
 if settings.enable_ui:
