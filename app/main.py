@@ -13,8 +13,11 @@ from pathlib import Path
 # Ensure project root is on sys.path for imports like `from core.encryption_engine import ...`
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import encrypt, decrypt, files, health
 from app.config import get_settings
@@ -89,12 +92,43 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — origins from env var (CFG-01, API-03 handled in Phase 3)
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """Return D-01 structured body for all HTTP exceptions. Per API-01."""
+    if isinstance(exc.detail, dict) and "error_code" in exc.detail:
+        body = exc.detail
+    else:
+        body = {
+            "error_code": "HTTP_ERROR",
+            "message": str(exc.detail) if exc.detail is not None else "HTTP error",
+            "detail": None,
+        }
+    _logger.warning("HTTP %d %s: %s", exc.status_code, request.url.path, body.get("error_code"))
+    return JSONResponse(status_code=exc.status_code, content=body)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Return D-01 structured 422 for Pydantic validation failures. Per API-01, D-07."""
+    _logger.warning("Validation error on %s", request.url.path)
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error_code": "VALIDATION_ERROR",
+            "message": "Request validation failed",
+            "detail": str(exc.errors()),
+        },
+    )
+
+
+# CORS — origins from env var; allow_credentials=False when wildcard (D-08/CR-04, API-03)
 origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+is_wildcard = origins == ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins != ["*"] else ["*"],
-    allow_credentials=True,
+    allow_origins=origins,
+    allow_credentials=not is_wildcard,   # False when wildcard — CORS spec compliance per D-08
     allow_methods=["*"],
     allow_headers=["*"],
 )
