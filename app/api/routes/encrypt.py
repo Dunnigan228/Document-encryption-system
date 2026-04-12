@@ -20,7 +20,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_file_service
 from app.config import Settings, get_settings
-from app.schemas.common import AcceptedResponse
+from app.schemas.common import AcceptedResponse, ErrorResponse
 from app.services.file_service import FileService
 from core.encryption_engine import EncryptionEngine
 from core.key_manager import KeyManager
@@ -35,7 +35,18 @@ _file_handler = FileHandler()
 _logger = logging.getLogger(__name__)
 
 
-@router.post("/encrypt", response_model=AcceptedResponse, status_code=202)
+@router.post(
+    "/encrypt",
+    response_model=AcceptedResponse,
+    status_code=202,
+    summary="Encrypt a document",
+    description="Upload a document file for encryption. Returns a job ID immediately (HTTP 202). Poll /api/files/{file_id} for status.",
+    responses={
+        413: {"model": ErrorResponse, "description": "File exceeds size limit"},
+        415: {"model": ErrorResponse, "description": "Unsupported file format"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+    },
+)
 async def encrypt_file(
     file: UploadFile = File(...),
     password: str = Form(None),

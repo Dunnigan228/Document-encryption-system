@@ -15,13 +15,21 @@ from fastapi.responses import FileResponse
 
 from app.api.deps import get_file_service
 from app.config import Settings, get_settings
-from app.schemas.common import JobStatusResponse
+from app.schemas.common import JobStatusResponse, ErrorResponse
 from app.services.file_service import FileService
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
 
-@router.get("/{file_id}", response_model=JobStatusResponse)
+@router.get(
+    "/{file_id}",
+    response_model=JobStatusResponse,
+    summary="Get job status",
+    description="Poll the processing status of an upload job by file_id. Returns 200 for all known jobs including failed ones. Returns 404 when file_id is unknown.",
+    responses={
+        404: {"model": ErrorResponse, "description": "Job not found"},
+    },
+)
 async def get_job_status(
     file_id: str,
     file_svc: FileService = Depends(get_file_service),
@@ -59,7 +67,16 @@ async def get_job_status(
     )
 
 
-@router.get("/{file_id}/download")
+@router.get(
+    "/{file_id}/download",
+    response_class=FileResponse,
+    summary="Download processed result",
+    description="Download the processed file once status is 'complete'. Returns the file as an octet-stream.",
+    responses={
+        404: {"model": ErrorResponse, "description": "Job not found or not complete"},
+        400: {"model": ErrorResponse, "description": "Invalid file reference"},
+    },
+)
 async def download_result(
     file_id: str,
     settings: Settings = Depends(get_settings),

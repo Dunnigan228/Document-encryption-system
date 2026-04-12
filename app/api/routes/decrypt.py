@@ -21,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_file_service
 from app.config import Settings, get_settings
-from app.schemas.common import AcceptedResponse
+from app.schemas.common import AcceptedResponse, ErrorResponse
 from app.services.file_service import FileService
 from core.decryption_engine import DecryptionEngine
 from core.key_manager import KeyManager
@@ -34,7 +34,17 @@ _file_handler = FileHandler()
 _logger = logging.getLogger(__name__)
 
 
-@router.post("/decrypt", response_model=AcceptedResponse, status_code=202)
+@router.post(
+    "/decrypt",
+    response_model=AcceptedResponse,
+    status_code=202,
+    summary="Decrypt a document",
+    description="Upload an encrypted file and its key file for decryption. Returns a job ID immediately (HTTP 202). Poll /api/files/{file_id} for status.",
+    responses={
+        413: {"model": ErrorResponse, "description": "File exceeds size limit"},
+        422: {"model": ErrorResponse, "description": "Validation error or wrong key"},
+    },
+)
 async def decrypt_file(
     encrypted_file: UploadFile = File(...),
     key_file: UploadFile = File(...),
