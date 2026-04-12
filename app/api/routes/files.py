@@ -3,7 +3,11 @@ GET /api/files/{file_id}          — poll job status
 GET /api/files/{file_id}/download — stream processed result file
 
 Replaces the old GET /api/download/{file_id}/{file_type} endpoint.
+D-06/API-01: All 404s use structured error body with error_code=NOT_FOUND.
+D-13/WR-03: Download endpoint performs parts-based path containment check to prevent
+            path traversal via registry rel_path.
 """
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -30,7 +34,14 @@ async def get_job_status(
     """
     entry = file_svc.get(file_id)
     if entry is None:
-        raise HTTPException(status_code=404, detail=f"Job not found: {file_id}")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error_code": "NOT_FOUND",
+                "message": "Job not found",
+                "detail": None,
+            },
+        )
 
     status = entry.get("status", "unknown")
     download_url = f"/api/files/{file_id}/download" if status == "complete" else None
@@ -59,16 +70,28 @@ async def download_result(
     Returns 404 if job not found or not yet complete.
     Per D-09: deletes the original uploaded file after streaming the result.
     Does NOT delete the result file — that is handled by the TTL cleanup task.
+    D-13/WR-03: path containment check prevents traversal via registry rel_path.
     """
     entry = file_svc.get(file_id)
     if entry is None:
-        raise HTTPException(status_code=404, detail=f"Job not found: {file_id}")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error_code": "NOT_FOUND",
+                "message": "Job not found",
+                "detail": None,
+            },
+        )
 
     status = entry.get("status")
     if status != "complete":
         raise HTTPException(
             status_code=404,
-            detail=f"File not ready for download. Current status: {status}",
+            detail={
+                "error_code": "NOT_FOUND",
+                "message": f"File not ready for download — current status: {status}",
+                "detail": None,
+            },
         )
 
     result_paths = entry.get("result_paths") or {}
@@ -88,11 +111,39 @@ async def download_result(
         media_type = "application/octet-stream"
 
     if not rel_path:
-        raise HTTPException(status_code=404, detail="Result file path not recorded in job")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error_code": "NOT_FOUND",
+                "message": "Result file path not recorded",
+                "detail": None,
+            },
+        )
 
     file_path = temp_dir / rel_path
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Result file not found on disk")
+    resolved = file_path.resolve()
+    temp_resolved = temp_dir.resolve()
+
+    # D-13/WR-03: parts-based containment — safe on both Windows (dev) and Linux (Railway)
+    if resolved.parts[:len(temp_resolved.parts)] != temp_resolved.parts:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "INVALID_FILE_REFERENCE",
+                "message": "Invalid file reference",
+                "detail": None,
+            },
+        )
+
+    if not resolved.exists():
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error_code": "NOT_FOUND",
+                "message": "Result file not found on disk",
+                "detail": None,
+            },
+        )
 
     # D-09: delete original AFTER building FileResponse (FileResponse streams lazily,
     # but the path is recorded now — safe to unlink the source, not the result).
@@ -104,7 +155,7 @@ async def download_result(
         file_svc.update_status(file_id, status, original_path=None)
 
     return FileResponse(
-        path=str(file_path),
+        path=str(resolved),
         media_type=media_type,
         filename=download_name,
     )
