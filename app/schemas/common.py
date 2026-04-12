@@ -64,3 +64,39 @@ class JobStatusResponse(BaseModel):
     poll_url: str                        # "/api/files/{file_id}"
     download_url: Optional[str] = None  # set only when status == "complete"
     error: Optional[str] = None         # set only when status == "failed"
+
+
+class KeyGenerateResponse(BaseModel):
+    """Response for POST /api/keys/generate. Per D-06.
+    NOTE: private_key is PKCS8 PEM (-----BEGIN PRIVATE KEY-----).
+    NEVER log this response object — it contains private key material.
+    """
+    public_key: str    # PEM-encoded (-----BEGIN PUBLIC KEY-----)
+    private_key: str   # PKCS8 PEM-encoded (-----BEGIN PRIVATE KEY-----)
+    key_size: int      # Always 4096
+    format: str        # Always "PEM"
+
+
+class InspectFlagsResponse(BaseModel):
+    """Parsed flags bitmask from encrypted file header. Per D-10."""
+    compressed: bool
+    multi_layer: bool
+    rsa_protected: bool
+    integrity_check: bool
+    metadata_encrypted: bool
+
+
+class InspectResponse(BaseModel):
+    """Response for POST /api/files/inspect. Per D-10."""
+    format_version: str       # e.g. "1.0.0"
+    original_filename: str
+    file_type: str
+    timestamp: int            # Unix epoch seconds
+    flags: InspectFlagsResponse
+    original_size: int        # bytes
+    compressed_size: int      # bytes
+
+
+class HealthResponse(BaseModel):
+    """Response for GET /health. Per API-04 annotation audit."""
+    status: str               # always "ok"
