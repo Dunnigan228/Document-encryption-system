@@ -71,18 +71,24 @@ async def get_job_status(
     "/{file_id}/download",
     response_class=FileResponse,
     summary="Download processed result",
-    description="Download the processed file once status is 'complete'. Returns the file as an octet-stream.",
+    description=(
+        "Download the processed file once status is 'complete'. "
+        "Use query parameter `type` to select which artifact to download: "
+        "'encrypted' (default for encrypt jobs), 'key' (JSON key bundle), "
+        "'decrypted' (default for decrypt jobs), or 'auto' (picks based on job type)."
+    ),
     responses={
         404: {"model": ErrorResponse, "description": "Job not found or not complete"},
-        400: {"model": ErrorResponse, "description": "Invalid file reference"},
+        400: {"model": ErrorResponse, "description": "Invalid file reference or type"},
     },
 )
 async def download_result(
     file_id: str,
+    type: str = "auto",
     settings: Settings = Depends(get_settings),
     file_svc: FileService = Depends(get_file_service),
 ):
-    """GET /api/files/{file_id}/download — stream the processed result file.
+    """GET /api/files/{file_id}/download?type=auto|encrypted|key|decrypted
 
     Returns 404 if job not found or not yet complete.
     Per D-09: deletes the original uploaded file after streaming the result.
@@ -116,23 +122,36 @@ async def download_result(
 
     # Determine which output file to serve and its download filename
     job_type = entry.get("job_type", "encrypt")
-    if job_type == "encrypt":
+    original = entry.get("original_filename", "file")
+
+    if type == "key":
+        rel_path = result_paths.get("key_file")
+        download_name = f"{original}.key"
+        media_type = "application/json"
+    elif type == "encrypted" or (type == "auto" and job_type == "encrypt"):
         rel_path = result_paths.get("encrypted_file")
-        original = entry.get("original_filename", "file")
         download_name = f"{original}.enc"
         media_type = "application/octet-stream"
-    else:
+    elif type == "decrypted" or (type == "auto" and job_type == "decrypt"):
         rel_path = result_paths.get("decrypted_file")
-        original = result_paths.get("original_filename") or entry.get("original_filename", "file")
-        download_name = original
+        download_name = result_paths.get("original_filename") or original
         media_type = "application/octet-stream"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "INVALID_TYPE",
+                "message": f"Invalid download type: '{type}'. Use 'auto', 'encrypted', 'key', or 'decrypted'.",
+                "detail": None,
+            },
+        )
 
     if not rel_path:
         raise HTTPException(
             status_code=404,
             detail={
                 "error_code": "NOT_FOUND",
-                "message": "Result file path not recorded",
+                "message": f"No '{type}' file available for this job",
                 "detail": None,
             },
         )
